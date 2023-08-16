@@ -6,7 +6,6 @@ from transformers import (
     TrainerCallback,
     TrainingArguments,
 )
-import torch
 from peft import LoraConfig
 import os
 
@@ -14,15 +13,27 @@ dataset = load_dataset("text", data_dir="data")
 dataset["train"] = dataset["train"].filter(lambda e: len(e["text"].strip()) > 0)
 
 
+base_model_name = "meta-llama/Llama-2-7b-hf"
+
 model = AutoModelForCausalLM.from_pretrained(
-    "facebook/opt-125m", load_in_8bit=True, device_map="auto"
+    base_model_name,
+    use_cache=False,
+    device_map="auto",
+    trust_remote_code=True,
+    use_auth_token=True,
+    load_in_8bit=True,
 )
-tokenizer = AutoTokenizer.from_pretrained("facebook/opt-125m")
+
+# More info: https://github.com/huggingface/transformers/pull/24906
+model.config.pretraining_tp = 1
+
+tokenizer = AutoTokenizer.from_pretrained(base_model_name)
+tokenizer.pad_token = tokenizer.eos_token
 
 peft_config = LoraConfig(
-    r=16,
-    lora_alpha=32,
-    lora_dropout=0.05,
+    lora_alpha=16,
+    lora_dropout=0.1,
+    r=64,
     bias="none",
     task_type="CAUSAL_LM",
 )
@@ -51,7 +62,6 @@ training_arguments = TrainingArguments(
     max_grad_norm=0.3,
     max_steps=1000,
     warmup_ratio=0.03,
-    # group_by_length=True,
     lr_scheduler_type="constant",
 )
 
@@ -60,11 +70,8 @@ trainer = SFTTrainer(
     model,
     train_dataset=dataset["train"],
     dataset_text_field="text",
-    # torch_dtype=torch.bfloat16,
     peft_config=peft_config,
     callbacks=[PeftSavingCallback()],
-    # max_seq_length=512,
-    # dataset_batch_size=1,
     args=training_arguments,
 )
 

@@ -1,12 +1,10 @@
-from transformers import LlamaForCausalLM, LlamaTokenizer
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
 
-# tokenizer = LlamaTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat-hf")
-# model = LlamaForCausalLM.from_pretrained("meta-llama/Llama-2-7b-chat-hf")
+base_model_name = "meta-llama/Llama-2-7b-hf"
 
-base_model = AutoModelForCausalLM.from_pretrained("facebook/opt-125m")
-tokenizer = AutoTokenizer.from_pretrained("facebook/opt-125m")
+base_model = AutoModelForCausalLM.from_pretrained(base_model_name)
+tokenizer = AutoTokenizer.from_pretrained(base_model_name)
 
 model = PeftModel.from_pretrained(
     base_model,
