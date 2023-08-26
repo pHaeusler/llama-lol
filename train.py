@@ -5,23 +5,29 @@ from transformers import (
     AutoTokenizer,
     TrainerCallback,
     TrainingArguments,
+    BitsAndBytesConfig,
 )
+import torch
 from peft import LoraConfig
 import os
 
 dataset = load_dataset("text", data_dir="data")
 dataset["train"] = dataset["train"].filter(lambda e: len(e["text"].strip()) > 0)
 
-
 base_model_name = "meta-llama/Llama-2-7b-hf"
+
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_compute_dtype=torch.float16,
+    bnb_4bit_use_double_quant=True,
+)
 
 model = AutoModelForCausalLM.from_pretrained(
     base_model_name,
-    use_cache=False,
+    quantization_config=bnb_config,
     device_map="auto",
     trust_remote_code=True,
-    use_auth_token=True,
-    load_in_8bit=True,
 )
 
 # More info: https://github.com/huggingface/transformers/pull/24906
@@ -29,6 +35,7 @@ model.config.pretraining_tp = 1
 
 tokenizer = AutoTokenizer.from_pretrained(base_model_name)
 tokenizer.pad_token = tokenizer.eos_token
+tokenizer.padding_side = "right"
 
 peft_config = LoraConfig(
     lora_alpha=16,
@@ -52,8 +59,8 @@ class PeftSavingCallback(TrainerCallback):
 
 training_arguments = TrainingArguments(
     output_dir="./results",
-    per_device_train_batch_size=2,
-    gradient_accumulation_steps=10,
+    per_device_train_batch_size=40,
+    gradient_accumulation_steps=1,
     optim="paged_adamw_32bit",
     save_steps=50,
     logging_steps=10,
